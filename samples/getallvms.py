@@ -25,7 +25,11 @@ from pyVmomi import vmodl
 from pyVmomi import vim
 
 import tools.cli as cli
+import ssl
 
+sslContext = ssl.create_default_context()
+sslContext.check_hostname = False
+sslContext.verify_mode = ssl.CERT_NONE
 
 def print_vm_info(virtual_machine):
     """
@@ -70,7 +74,8 @@ def main():
         service_instance = connect.SmartConnect(host=args.host,
                                                 user=args.user,
                                                 pwd=args.password,
-                                                port=int(args.port))
+                                                port=int(args.port),
+                                                sslContext=sslContext)
 
         atexit.register(connect.Disconnect, service_instance)
 
@@ -95,3 +100,4 @@ def main():
 # Start program
 if __name__ == "__main__":
     main()
+
