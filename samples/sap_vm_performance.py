@@ -20,7 +20,6 @@ import atexit
 import getpass
 import ssl
 
-
 def main():
 
     args = cli.get_args()
@@ -32,6 +31,8 @@ def main():
 #            user=args.user,
 #            pwd=args.password,
 #            port=int(args.port))
+#        atexit.register(Disconnect, si)
+
         context = ssl._create_unverified_context()
         si = SmartConnect(host=args.host,
              user=args.user,
@@ -49,16 +50,30 @@ def main():
     content = si.RetrieveContent()
     perfManager = content.perfManager
 
+
+##############################################################################
     # create a mapping from performance stats to their counterIDs
     # counterInfo: [performance stat => counterId]
     # performance stat example: cpu.usagemhz.LATEST
     # counterId example: 6
     counterInfo = {}
     for c in perfManager.perfCounter:
-        prefix = c.groupInfo.key
         fullName = c.groupInfo.key + "." + c.nameInfo.key + "." + c.rollupType
+        print(fullName)
         counterInfo[fullName] = c.key
+#    counterids=perfManager.QueryPerfCounterByLevel(level=1)
 
+
+    for c in perfManager.QueryPerfCounterByLevel(level=1):
+      fullName = c.groupInfo.key + "." + c.nameInfo.key + "." + c.rollupType
+      counterInfo[fullName] = c.key
+
+#    print(counterInfo)
+    liste=[ 'cpu.ready.summation', 'cpu.usagemhz.average' ]
+    counterIDs = [counterInfo[k] for k in liste if k in counterInfo]
+#    print(counterIDs)
+
+##############################################################################
     # create a list of vim.VirtualMachine objects so
     # that we can query them for statistics
     container = content.rootFolder
@@ -68,40 +83,61 @@ def main():
     containerView = content.viewManager.CreateContainerView(container,
                                                             viewType,
                                                             recursive)
+
     children = containerView.view
+ #   print(children)
+
+
+##############################################################################
 
     # Loop through all the VMs
     for child in children:
         # Get all available metric IDs for this VM
-        counterIDs = [m.counterId for m in
-                      perfManager.QueryAvailablePerfMetric(entity=child)]
+#        counterIDs = [m.counterId for m in
+#                      perfManager.QueryAvailablePerfMetric(entity=child)]
+#        counterIDs = [ 6, 12 ]
 
+
+#        perfinfo = [vim.PerformanceManager.CounterInfo(key=i)
+#        for i in counterIDs]
+#        print(perfinfo)
+
+
+#        print(counterIDs)
         # Using the IDs form a list of MetricId
         # objects for building the Query Spec
         metricIDs = [vim.PerformanceManager.MetricId(counterId=c,
                                                      instance="*")
                      for c in counterIDs]
 
+ #       print(metricIDs)
+
         # Build the specification to be used
         # for querying the performance manager
         spec = vim.PerformanceManager.QuerySpec(maxSample=1,
                                                 entity=child,
                                                 metricId=metricIDs)
+#                                                intervalId=10)
+
         # Query the performance manager
         # based on the metrics created above
         result = perfManager.QueryStats(querySpec=[spec])
+#        print(result)
 
         # Loop through the results and print the output
         output = ""
         for r in result:
-            output += "name:        " + child.summary.config.name + "\n"
-            for val in result[0].value:
-                output += counterInfo.keys()[
-                          counterInfo.values().index(val.id.counterId)]
-                output += ": " + str(val.value[0]) + "\n"
-            output += "\n"
+#            print(r)
+            if child.summary.config.annotation and child.summary.runtime.powerState=="poweredOn":
+               output += "id:" + child.summary.config.name + "\n" + child.summary.config.annotation
+               for val in result[0].value:
+                  output += counterInfo.keys()[
+                            counterInfo.values().index(val.id.counterId)]
+                  output += ": " + str(val.value[0]) + "\n"
+               output += "\n"
 
         print(output)
 
 if __name__ == "__main__":
     main()
+
