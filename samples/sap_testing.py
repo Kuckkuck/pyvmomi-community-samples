@@ -78,17 +78,18 @@ def main():
   #  children = containerView.view
   #  print(children)
 
-    counterids=perfManager.QueryPerfCounterByLevel(level=1)
+    counterids=perfManager.QueryPerfCounterByLevel(level=2)
 
     metricids={}
 
     for r in counterids:
       counteridkey = r.groupInfo.key + "." + r.nameInfo.key + "." + r.rollupType
       metricids[counteridkey] = r.key
+      print(counteridkey + ": " + str(r.key))
 
-    print(counteridkey)
-    liste=[ 'cpu.totalmhz.average', 'cpu.usagemhz.average', 'cpu.ready.summation' ]
-    CounterIDs = [metricids[k] for k in liste if k in metricids]
+
+ #   liste=[ 'cpu.totalmhz.average', 'cpu.usagemhz.average', 'cpu.ready.summation' ]
+ #   CounterIDs = [metricids[k] for k in liste if k in metricids]
 
 
 
