@@ -17,8 +17,9 @@ from pyVmomi import vim
 from tools import cli
 from pyVim.connect import SmartConnect, Disconnect
 import atexit
-import getpass
+#import getpass
 import ssl
+import datetime
 
 def main():
 
@@ -26,13 +27,6 @@ def main():
 
     # Connect to the host without SSL signing
     try:
-#        si = SmartConnectNoSSL(
-#            host=args.host,
-#            user=args.user,
-#            pwd=args.password,
-#            port=int(args.port))
-#        atexit.register(Disconnect, si)
-
         context = ssl._create_unverified_context()
         si = SmartConnect(host=args.host,
              user=args.user,
@@ -56,74 +50,65 @@ def main():
     # counterInfo: [performance stat => counterId]
     # performance stat example: cpu.usagemhz.LATEST
     # counterId example: 6
-
-  #  for c in perfManager.perfCounter:
-  #      fullName = c.groupInfo.key + "." + c.nameInfo.key + "." + c.rollupType
-  #      print(fullName)
-  #      counterInfo[fullName] = c.key
-#    counterids=perfManager.QueryPerfCounterByLevel(level=1)
-
+    print('Start: Date now: %s' % datetime.datetime.now())
     counterInfo = {}
+    counterids=perfManager.QueryPerfCounterByLevel(level=1)
 
-    for c in perfManager.QueryPerfCounterByLevel(level=1):
+    for c in counterids:
         fullName = c.groupInfo.key + "." + c.nameInfo.key + "." + c.rollupType
         counterInfo[fullName] = c.key
 
-#    print(counterInfo)
-    liste=[ 'cpu.usage.average', 'cpu.usagemhz.average', 'cpu.ready.summation', 'mem.usage.average', 'mem.swapinRate.average', 'mem.swapoutRate.average', 'mem.vmmemctl.average', 'mem.consumed.average', 'mem.overhead.average', 'disk.usage.average'  ]
-    counterIDs = [counterInfo[k] for k in liste if k in counterInfo]
+    print('QueryPerfCounterByLevel: Date now: %s' % datetime.datetime.now())
+    collected=[ 'cpu.usage.average', 'cpu.usagemhz.average', 'cpu.ready.summation', 'mem.usage.average', 'mem.swapinRate.average', 'mem.swapoutRate.average', 'mem.vmmemctl.average', 'mem.consumed.average', 'mem.overhead.average', 'disk.usage.average'  ]
+    counterIDs = [counterInfo[k] for k in collected if k in counterInfo]
 
 ##############################################################################
-    # create a list of vim.VirtualMachine objects so
-    # that we can query them for statistics
+    # create a list of vim.VirtualMachine objects so that we can query them for statistics
     container = content.rootFolder
     viewType = [vim.VirtualMachine]
     recursive = True
 
+# REQUEST CreateContainerView
     containerView = content.viewManager.CreateContainerView(container,
                                                             viewType,
                                                             recursive)
 
     children = containerView.view
+    count_vms=len(children)
+    print("Count of VMs:" + str(count_vms))
+    print('CreateContainerView: Start: Date now: %s' % datetime.datetime.now())
 
+# REQUEST MetricId
+#    metricIDs = [vim.PerformanceManager.MetricId(counterId=c,
+#                                                   instance="*")
+#                  for c in counterIDs]
+#    print('MetricId: Start: Date now: %s' % datetime.datetime.now())
+########################################################################################
     for child in children:
      if child.summary.config.annotation and child.summary.runtime.powerState=="poweredOn":
         lis=child.summary.config.annotation.split('\n')
         d = dict(s.rsplit(':',1) for s in filter(None, lis))
 
-#        print("name:" + d['name'] + ", project_id:" + d['projectid'])
-
-        # Get all available metric IDs for this VM
-#        counterIDs = [m.counterId for m in
-#                      perfManager.QueryAvailablePerfMetric(entity=child)]
-#        counterIDs = [ 6, 12 ]
-
-
-#        perfinfo = [vim.PerformanceManager.CounterInfo(key=i)
-#        for i in counterIDs]
-#        print(perfinfo)
-
-
-#        print(counterIDs)
-        # Using the IDs form a list of MetricId
-        # objects for building the Query Spec
+# REQUEST MetricID
         metricIDs = [vim.PerformanceManager.MetricId(counterId=c,
                                                      instance="*")
                      for c in counterIDs]
+        print('MetricId: Start: Date now: %s' % datetime.datetime.now())
 
-        # Build the specification to be used for querying the performance manager
+#        print(metricIDs)
+# REQUEST QuerySpec
         spec = vim.PerformanceManager.QuerySpec(maxSample=1,
                                                 entity=child,
-                                                metricId=metricIDs)
+                                                metricId=metricIDs,
+                                                intervalId=20)
 
-        # Query the performance manager based on the metrics created above
+        print('QuerySpec: Start: Date now: %s' % datetime.datetime.now())
+# REQUEST QueryStats
         result = perfManager.QueryStats(querySpec=[spec])
-#        print(result)
-
+        print('QueryStats: Start: Date now: %s' % datetime.datetime.now())
         # Loop through the results and print the output
         output = ""
         for r in result:
-#            print(r)
             if child.summary.config.annotation and child.summary.runtime.powerState=="poweredOn":
                for val in result[0].value:
                     if val:
@@ -137,4 +122,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
