@@ -1,7 +1,7 @@
 main:
     host: 'localhost'
-    host: 'administrator@vsphere.local'
-    vcenter_password: 'password'
+    user: 'administrator@vsphere.local'
+    password: 'password'
     port: 443
     ignore_ssl: True
     vm_metrics:
