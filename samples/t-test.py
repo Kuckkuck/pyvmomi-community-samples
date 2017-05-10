@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pyVmomi import vim, VmomiSupport
+from pyVmomi import vim, vmodl
 from prometheus_client import start_http_server, Summary, Counter, Gauge
 from tools import cli
 from pyVim.connect import SmartConnect, Disconnect
@@ -59,7 +59,7 @@ def main():
         counterInfo[fullName] = c.key
 
         # define a gauges for the counter ids
-        g[fullName.replace('.','_')] = Gauge(fullName.replace('.','_'), fullName.replace('.','_'), ['vmware_name'])
+        g['vcenter_' + fullName.replace('.','_')] = Gauge('vcenter_' + fullName.replace('.','_'), 'vcenter_' + fullName.replace('.','_'), ['vmware_name', 'project_id', 'vcenter_name'])
 
 #        print('QueryPerfCounterByLevel: Date now: %s' % datetime.datetime.now())
 #        collected=[ 'cpu.usage.average', 'cpu.usagemhz.average', 'cpu.ready.summation', 'mem.usage.average', 'mem.swapinRate.average', 'mem.swapoutRate.average', 'mem.vmmemctl.average', 'mem.consumed.average', 'mem.overhead.average', 'disk.usage.average'  ]
@@ -134,8 +134,10 @@ def main():
             #                     print(filter(None, output))
             #        if counterInfo.keys()[counterInfo.values().index(val.id.counterId)] == 'cpu.usage.average':
                             # send metrics to prometheus exporter
-                                 g[counterInfo.keys()[counterInfo.values().index(val.id.counterId)].replace('.','_')].labels(d['name']).set(val.value[0])
-            except VmomiSupport.ManagedObjectNotFound:
+
+            # remove cloud.sap from hostname for a shorter vcenter_name label via replace
+                                 g['vcenter_' + counterInfo.keys()[counterInfo.values().index(val.id.counterId)].replace('.','_')].labels(d['name'], d['projectid'], args.host.replace('.cloud.sap','')).set(val.value[0])
+            except vmodl.fault.ManagedObjectNotFound:
                     print('===> lost machine')
 
 if __name__ == "__main__":
