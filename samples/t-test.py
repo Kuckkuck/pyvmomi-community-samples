@@ -4,13 +4,12 @@
 from pyVmomi import vim, vmodl
 # prometheus export functionality
 from prometheus_client import start_http_server, Gauge
-from tools import cli
 from pyVim.connect import SmartConnect, Disconnect
 import atexit
 import ssl
-import datetime
 from yamlconfig import YamlConfig
 import argparse
+import re
 
 # vcenter connection defaults
 defaults = {
@@ -33,22 +32,18 @@ def main():
     # check for insecure ssl option
     si = None
     context = None
-    if config['main']['ignore_ssl'] and \
+    if config.get('main').get('ignore_ssl') and \
        hasattr(ssl, "_create_unverified_context"):
         context = ssl._create_unverified_context()
 
     # connect to vcenter
-    try:
-        si = SmartConnect(
-            host=config['main']['host'],
-            user=config['main']['user'],
-            pwd=config['main']['password'],
-            port=int(config['main']['port']),
-            sslContext=context)
-        atexit.register(Disconnect, si)
-
-    except IOError as e:
-        pass
+    si = SmartConnect(
+         host=config.get('main').get('host'),
+         user=config.get('main').get('user'),
+         pwd=config.get('main').get('password'),
+         port=int(config.get('main').get('port')),
+         sslContext=context)
+    atexit.register(Disconnect, si)
 
     if not si:
         raise SystemExit("Unable to connect to host with supplied info.")
@@ -64,6 +59,8 @@ def main():
     counterInfo = {}
     gauge = {}
 
+    #try to filter out openstack generated vms
+    pattern = re.compile("^name:")
     # create a mapping from performance stats to their counterIDs
     # counterInfo: [performance stat => counterId]
     # performance stat example: cpu.usagemhz.LATEST
@@ -110,25 +107,25 @@ def main():
         for child in children:
             try:
                 # only consider machines which have an annotation and are powered on
-                if child.summary.config.annotation and child.summary.runtime.powerState == "poweredOn":
+                if child.summary.config.annotation and child.summary.runtime.powerState == "poweredOn" and pattern.match(child.summary.config.annotation):
                     print('INFO: current vm processed - ' +
                           child.summary.config.name)
+
                     # split the multi-line annotation into a dict per property (name, project-id, ...)
-                    annotation_lines = child.summary.config.annotation.split(
-                        '\n')
+                    annotation_lines = child.summary.config.annotation.split('\n')
+
+
+
                     # the filter is for filtering out empty lines
+
                     annotations = dict(
                         s.rsplit(':', 1)
-                        for s in filter(None, annotation_lines))
+                         for s in filter(None, annotation_lines))
 
                     # get a list of metricids for this vm in preparation for the stats query
-                    metricIDs = [
-                        vim.PerformanceManager.MetricId(
-                            counterId=i, instance="*") for i in counterIDs
-                    ]
+                    metricIDs = [vim.PerformanceManager.MetricId(counterId=i, instance="*") for i in counterIDs]
 
-                    # query spec for the metric stats query
-                    # we might get the interval from PerfProviderSummary later ...
+                    # query spec for the metric stats query, we might get the interval from PerfProviderSummary later ...
                     spec = vim.PerformanceManager.QuerySpec(
                         maxSample=1,
                         entity=child,
